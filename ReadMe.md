@@ -1,23 +1,22 @@
-# えでゅけーしょんおんりー
-
 # Manga-Lover
 
-## Q.このぷろぐらむはなんですcar？
-### A.えっとぉ～mangalove.meから画像落としてぐへへぇするぷろぐらむでふぉ
+## Education Only
 
-## ほうとううせ
+mangalove.meからDL&複合化できます。
+
+## How To Use
 
 ### 動作環境：
 ###    - node.js v18.x以上
-###    - いんたーねっつ
+###    - Internet
 ###    - git
 
 
 ### clone&npm install
-```sh git clone https://github.com/nananankona/Manga-Lover.git && cd Manga-Lover && npm install```
+```git clone https://github.com/nananankona/Manga-Lover.git && cd Manga-Lover && npm install```
 
-### 走る
-```sh npm app.js```
+### runw
+```npm app.js```
 
 
 気に入ったらいいねしてくれてもいいんだよぉ...///
