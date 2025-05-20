@@ -18,7 +18,7 @@ mangalove.me から漫画をダウンロード＆複合化できるツールで�
 
 1. Clone&cd:
 ```bash
-git clone https://github.com/nananankona/Manga-Lover.git && "cd Manga-Lover" && "npm install"
+git clone https://github.com/nananankona/Manga-Lover.git && cd Manga-Lover && npm install
 ```
 
 ### Run
