@@ -15,105 +15,133 @@ async function main() {
   try {
     console.log("********MangaLover********");
     console.log("*The MangaLove Downloader*");
-    console.log("*    Made By Kona        *");
+    console.log("*     Made By Kona       *");
     console.log("*    Education only      *");
     console.log("**************************");
-    
-    const url = await askQuestion('Enter URL (例: https://mangalove.me/comic/4080): ');
-    
+
+    let url = process.argv[2];
+    if (!url) {
+      url = await askQuestion('Enter URL (例: https://mangalove.me/comic/4080): ');
+    }
+
+    if (!url.startsWith('https://mangalove.me/comic/')) {
+      throw new Error('無効なURL形式です。mangalove.meの漫画URLを指定してください');
+    }
+
     const { data } = await axiosInstance.get(url);
     const $ = cheerio.load(data);
-    
+
     const genre = $('a[itemprop="genre"]').text().trim();
     const title = $('h1[itemprop="name"]').text().trim();
     const author = $('a[itemprop="author"]').text().trim();
     const publisher = $('a[itemprop="publisher"]').text().trim();
-    
+
     console.log(`[-]:
   -  ジャンル: ${genre}
   -  タイトル: ${title}
   -  作者: ${author}
   -  出版社: ${publisher}`);
-    
+
     const folderName = `./comics/[${genre}]-[${author}]-[${title}]-[${publisher}]/`;
-    
+
     if (!fs.existsSync(folderName)) {
       fs.mkdirSync(folderName, { recursive: true });
       console.log(`[-] Created Folder: ${folderName}`);
     }
-    
+
     const chapters = [];
-    $('ul.list-chapter li a').each((i, el) => {
-      const chapterTitle = $(el).find('.title').text().trim();
-      const chapterUrl = $(el).attr('href');
-      chapters.push({ title: chapterTitle, url: chapterUrl });
-    });
-    
+    let page = 1;
+    let hasMoreChapters = true;
+
+    while (hasMoreChapters) {
+      try {
+        const paginatedUrl = `${url}?page=${page}`;
+        const { data: pageData } = await axiosInstance.get(paginatedUrl);
+        const page$ = cheerio.load(pageData);
+
+        page$('ul.list-chapter li a').each((i, el) => {
+          const chapterTitle = $(el).find('.title').text().trim();
+          const chapterUrl = $(el).attr('href');
+          chapters.push({ title: chapterTitle, url: chapterUrl });
+        });
+
+        page++;
+      } catch (err) {
+        if (err.response && err.response.status === 404) {
+          hasMoreChapters = false;
+          console.log(`[-] Finished fetching chapters at page ${page - 1}`);
+        } else {
+          throw err;
+        }
+      }
+    }
+
+
     console.log(`[-] Found Chapters: ${chapters.length}`);
-    
+
     for (const chapter of chapters) {
       console.log(`[+] Download: ${chapter.title}`);
-      
+
       const chapterFolder = path.join(folderName, chapter.title);
       if (!fs.existsSync(chapterFolder)) {
         fs.mkdirSync(chapterFolder);
       }
-      
+
       const { data: viewerData } = await axiosInstance.get(chapter.url);
       const viewer$ = cheerio.load(viewerData);
-      
-      const scriptContent = viewer$('script').filter((i, el) => 
+
+      const scriptContent = viewer$('script').filter((i, el) =>
         $(el).text().includes('var pagesCount')
       ).text();
-      
+
       const pagesCount = extractVariable(scriptContent, 'pagesCount');
       const mangaID = extractVariable(scriptContent, 'mangaID');
       const seriesNumber = extractVariable(scriptContent, 'seriesNumber');
       const array = extractVariable(scriptContent, 'array');
       const keys = extractVariable(scriptContent, 'keys');
       const chapterID = extractVariable(scriptContent, 'chapterID');
-      
+
       console.log(`[-] Page: ${pagesCount}, MangaID: ${mangaID}, SeriesNumber: ${seriesNumber}`);
-      
+
       const imageArray = JSON.parse(array);
       const keyArray = JSON.parse(keys);
-      
+
       for (let i = 0; i < imageArray.length; i++) {
         const imageInfo = imageArray[i];
         const keyInfo = keyArray.find(k => k.id === imageInfo.id);
-        
+
         if (!keyInfo) {
           console.log(`[X] キーが見つかりません: ${imageInfo.id}`);
           continue;
         }
-        
+
         const imageUrl = `https://j1z76bln.user.webaccel.jp/comics/${mangaID}/web/${seriesNumber}/${imageInfo.filename}`;
         console.log(`[+] Downloading: ${imageUrl}`);
-        
+
         try {
           const { data: imageData } = await axiosInstance.get(imageUrl, { responseType: 'arraybuffer' });
-          
+
           const canvas = createCanvas(keyInfo.key.width, keyInfo.key.height);
           const obfuscatedImage = await loadImage(imageData);
           const deobfuscatedCanvas = deobfuscate(obfuscatedImage, keyInfo.key, canvas);
-          
+
           const outputPath = path.join(chapterFolder, `${i}.png`);
           const out = fs.createWriteStream(outputPath);
           const stream = deobfuscatedCanvas.createPNGStream();
           stream.pipe(out);
-          
+
           await new Promise((resolve, reject) => {
             out.on('finish', resolve);
             out.on('error', reject);
           });
-          
+
           console.log(`[+] Saved: ${outputPath}`);
         } catch (err) {
           console.error(`[X] 複合化鰓: ${err.message}`);
         }
       }
     }
-    
+
     console.log('[+] Completed.');
   } catch (err) {
     console.error('[X] Error:', err);
